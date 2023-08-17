@@ -1,41 +1,60 @@
-import pdfkit
 from bs4 import BeautifulSoup
+from weasyprint import HTML, CSS, default_url_fetcher
 from urllib.request import Request, urlopen
 
+### FUNCTIONS ###
+
+
 def request_url(url):
-    # Create a request object with the given URL and a user-agent header
     req = Request(str(url), headers={'User-Agent': 'Mozilla/5.0'})
-    # Use the urlopen function to open the request object and read the contents
     web_byte = urlopen(req).read()
-    # Convert the byte data to a UTF-8 encoded string
     webpage = web_byte.decode('utf-8')
-    # Return the webpage string
     return webpage
 
-
-input = ["https://eltoque.com/mas-violencia-y-desapariciones-forzadas-protestas-en-caimanera-cuba", ]
+### CONFIGURATIONS ###
 
 
 options = {
-    'page-size': 'A3',
-    'margin-top': '0.75in',
-    'margin-right': '0.75in',
-    'margin-bottom': '0.75in',
-    'margin-left': '0.75in',
-    'no-pdf-compression' : None,
-    'encoding': "UTF-8",
-    'enable-external-links' : None,
-    'background' : None,
-    'enable-internal-links' : None,
-    'enable-javascript' : None,
-    'images' : None,
-    #'javascript-delay' : 1000,
-    'disable-smart-shrinking' : None,
-    'no-stop-slow-scripts' : None,
-    'page-width' : '32.51cm',
-    'enable-forms' : None,
-    'print-media-type' : None,
+    'uncompressed_pdf': False,
+    'presentational_hints': False,
+    'optimize_images': True,
+    'jpeg_quality': 95,
+    'dpi': 300,
+    'enable_hinting': False,
+    'full_fonts': True,
+    'pdf_forms': False,
 }
 
-for idx, val in enumerate(input):
-    pdfkit.from_url(str(val), str(str(idx)+'.pdf'),options=options)
+css = CSS(string = '''@page { size: A3; margin: 1.5cm; }''')
+
+media = CSS(string = '@media { type: print; margin-left: 0px; }')
+
+### READ SOUP AND EDIT HTML ###
+
+webpage = request_url(
+    "https://eltoque.com/por-que-la-bancarizacion-forzosa-fracaso-antes-de-empezar")
+soup = BeautifulSoup(webpage, 'lxml')
+
+parent_element = soup.find(id='super-page-wrapper')
+
+# Remove innecesary elements
+child_elements = list(parent_element.children)
+for idx, val in enumerate(child_elements):
+    if idx < 4 or idx > 4:
+        val.decompose()
+
+# Changes margin
+element = soup.select_one('.iNddtr')
+if element:
+    # Modify the value of the 'margin-left' property
+    element['style'] = 'margin-left: 0px;'
+
+### PRINT HTML ###
+
+html = HTML(string=str(soup), encoding="UTF-8", media_type=[media])
+
+pdf = html.write_pdf(zoom=1, stylesheets=[css], options=options)
+
+output_path = 'test.pdf'
+with open(output_path, 'wb') as file:
+    file.write(pdf)
